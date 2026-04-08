@@ -9,6 +9,12 @@ A clean, dark-themed local book reading app built with Flutter, styled after the
 
 ---
 
+<img width="1915" height="1026" alt="image" src="https://github.com/user-attachments/assets/3b254bea-0cf4-4d24-808c-85fcf21c4c52" />
+
+<img width="1914" height="1024" alt="image" src="https://github.com/user-attachments/assets/f232b23e-d91d-44fd-9e1c-1a36d76a7d0d" />
+
+<img width="1915" height="1032" alt="image" src="https://github.com/user-attachments/assets/91a18fba-2c20-4713-b9bc-01b5213b4ee4" />
+
 ## Features
 - 📖 Library — store & manage local books (EPUB, PDF, TXT, MOBI)
 - 🔍 Search & Filter — by status and format, with sort options
