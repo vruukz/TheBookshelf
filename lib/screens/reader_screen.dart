@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:epub_view/epub_view.dart';
+import 'package:flutter_pdfview/flutter_pdfview.dart';
+import 'dart:io';
 import '../models/book.dart';
 import '../services/library_service.dart';
 import '../theme/app_theme.dart';
-import 'dart:math';
+import 'package:flutter/foundation.dart';
 
 class ReaderScreen extends StatefulWidget {
   final Book book;
-
   const ReaderScreen({super.key, required this.book});
 
   @override
@@ -17,80 +19,88 @@ class ReaderScreen extends StatefulWidget {
 
 class _ReaderScreenState extends State<ReaderScreen>
     with SingleTickerProviderStateMixin {
-  late PageController _pageController;
-  late int _currentPage;
+  // shared
   bool _showUI = false;
   bool _showSettings = false;
   double _fontSize = 16.0;
-  double _lineHeight = 1.7;
   bool _nightMode = true;
   late AnimationController _uiController;
   late Animation<double> _uiAnim;
 
-  // Simulated book content (in a real app this would parse epub/pdf)
-  static const List<String> _sampleContent = [
-    '''Chapter 1: The Foundation
+  // TXT
+  late PageController _pageController;
+  int _currentPage = 0;
+  List<String> _pages = ['Loading...'];
 
-In the beginning of software development, there was chaos. Systems were built without thought for the future, without care for the humans who would maintain them. Code was a mess of spaghetti, a tangle of dependencies, a nightmare of duplication.
+  // EPUB
+  EpubController? _epubController;
 
-Then came the pragmatic programmers. They saw the chaos and said: enough. They codified the wisdom of experienced developers into principles that could guide the next generation.
+  // PDF
+  int _pdfCurrentPage = 0;
+  int _pdfTotalPages = 0;
+  PDFViewController? _pdfViewController;
 
-The first principle is simple: care about your craft. Why spend your life developing software unless you care about doing it well? This book is about programming as a craft: how to hone your skills, and how to apply them wisely.''',
-    '''Chapter 1 (continued)
-
-The word pragmatic comes from the Latin pragmaticus, meaning "skilled in business," which itself comes from the Greek word meaning "to do." A Pragmatic Programmer gets things done, but gets them done right.
-
-What distinguishes Pragmatic Programmers? We feel it's an attitude, a style, a philosophy of approaching problems and their solutions. They think beyond the immediate problem, always trying to place it in its larger context, always trying to be aware of the bigger picture.
-
-With that larger context, they are able to spot other options, discover alternative approaches, and transform raw feedback into actionable insights.''',
-    '''Chapter 2: A Pragmatic Philosophy
-
-This chapter talks about the attitude and approach of a Pragmatic Programmer.
-
-The greatest of all weaknesses is the fear of appearing weak. Many developers are afraid to admit ignorance or mistakes. But the pragmatic programmer takes responsibility — and ownership — of everything they do.
-
-If your code is a mess, own it. If a deadline was missed, own it. If a teammate's morale has tanked because of your attitude, own it.
-
-The Cat Ate My Source Code: One of the cornerstones of the Pragmatic Philosophy is the idea of taking responsibility for yourself and your actions in terms of your career advancement, your learning and education, your project, and your day-to-day work.''',
-    '''Chapter 2 (continued): Software Entropy
-
-When disorder increases in software, programmers call it "software rot." Some folks blame this on physics and the second law of thermodynamics. Broken windows: don't leave "broken windows" (bad designs, wrong decisions, or poor code) unrepaired. Fix each one as soon as it is discovered. If there is insufficient time to fix it properly, then board it up.
-
-"If you find yourself on a project where the code is pristinely beautiful — cleanly written, well designed, and elegant — you will likely take extra special care not to mess it up, just like the first person to step into a newly carpeted, immaculate room will be very reluctant to be the one who tracks in the mud."''',
-    '''Chapter 3: The Basic Tools
-
-Every craftsman starts their journey with a basic set of good-quality tools. A woodworker might need rules, gauges, a couple of saws, some good planes, fine chisels, drills and braces, mallets, and clamps. These tools will be lovingly chosen, will be built to last, will perform specific jobs with little overlap with the other tools, and are comfortable to use.
-
-Tools amplify your talent. The better your tools, and the better you know how to use them, the more productive you can be. Start with a basic set of generally applicable tools. As you gain experience, and as you come across special requirements, you'll add to this basic set.
-
-Always be on the lookout for better ways of doing things.''',
-  ];
-
-  List<String> get _pages => _sampleContent;
+  String get _ext =>
+      widget.book.filePath.split('.').last.toLowerCase();
 
   @override
   void initState() {
     super.initState();
-    _currentPage = widget.book.currentPage > 0
-        ? widget.book.currentPage.clamp(0, _pages.length - 1)
-        : 0;
-    _pageController = PageController(initialPage: _currentPage);
+    _pageController = PageController();
     _uiController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 200),
     );
     _uiAnim = CurvedAnimation(parent: _uiController, curve: Curves.easeInOut);
-
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
+    if (_ext == 'epub') {
+      _epubController = EpubController(
+        document: EpubDocument.openFile(File(widget.book.filePath)),
+      );
+    } else if (_ext == 'txt') {
+      _loadTxt();
+    }
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _epubController?.dispose();
     _uiController.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    context.read<LibraryService>().updateProgress(widget.book.id, _currentPage);
+    context.read<LibraryService>().updateProgress(
+          widget.book.id,
+          _ext == 'pdf' ? _pdfCurrentPage : _currentPage,
+        );
     super.dispose();
+  }
+
+  Future<void> _loadTxt() async {
+    try {
+      final file = File(widget.book.filePath);
+      if (!await file.exists()) {
+        setState(() => _pages = ['File not found:\n${widget.book.filePath}']);
+        return;
+      }
+      final content = await file.readAsString();
+      final chunks = <String>[];
+      int i = 0;
+      while (i < content.length) {
+        int end = i + 1500;
+        if (end < content.length) {
+          final breakAt = content.lastIndexOf('\n\n', end);
+          if (breakAt > i) end = breakAt;
+        } else {
+          end = content.length;
+        }
+        chunks.add(content.substring(i, end).trim());
+        i = end;
+      }
+      setState(() => _pages = chunks.isEmpty ? ['Empty file'] : chunks);
+    } catch (e) {
+      setState(() => _pages = ['Error loading file:\n$e']);
+    }
   }
 
   void _toggleUI() {
@@ -106,22 +116,15 @@ Always be on the lookout for better ways of doing things.''',
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _nightMode ? const Color(0xFF0D1117) : const Color(0xFFF5F0E8),
+      backgroundColor:
+          _nightMode ? const Color(0xFF0D1117) : const Color(0xFFF5F0E8),
       body: GestureDetector(
         onTap: _toggleUI,
         child: Stack(
           children: [
-            PageView.builder(
-              controller: _pageController,
-              itemCount: _pages.length,
-              onPageChanged: (page) {
-                setState(() => _currentPage = page);
-                context.read<LibraryService>().updateProgress(widget.book.id, page);
-              },
-              itemBuilder: (context, index) => _buildPage(index),
-            ),
+            _buildReader(),
             _buildTopBar(),
-            _buildBottomBar(),
+            if (_ext != 'epub') _buildBottomBar(),
             if (_showSettings) _buildSettingsPanel(),
           ],
         ),
@@ -129,31 +132,107 @@ Always be on the lookout for better ways of doing things.''',
     );
   }
 
-  Widget _buildPage(int index) {
-    final bg = _nightMode ? const Color(0xFF0D1117) : const Color(0xFFF5F0E8);
-    final textColor = _nightMode ? const Color(0xFFD0D6E0) : const Color(0xFF1A1A1A);
-
-    return Container(
-      color: bg,
-      padding: EdgeInsets.fromLTRB(
-        24,
-        MediaQuery.of(context).padding.top + 60,
-        24,
-        MediaQuery.of(context).padding.bottom + 80,
-      ),
-      child: SingleChildScrollView(
-        child: Text(
-          _pages[index],
-          style: TextStyle(
-            color: textColor,
-            fontSize: _fontSize,
-            height: _lineHeight,
-            fontFamily: 'Georgia',
-            letterSpacing: 0.2,
+  Widget _buildReader() {
+    switch (_ext) {
+      case 'epub':
+        return EpubView(
+          controller: _epubController!,
+          builders: EpubViewBuilders<DefaultBuilderOptions>(
+            options: DefaultBuilderOptions(
+              textStyle: TextStyle(
+                fontSize: _fontSize,
+                height: 1.7,
+                color: _nightMode
+                    ? const Color(0xFFD0D6E0)
+                    : const Color(0xFF1A1A1A),
+              ),
+            ),
+            chapterDividerBuilder: (_) => const Divider(
+              color: AppTheme.borderColor,
+              height: 32,
+            ),
           ),
-        ),
+        );
+
+      case 'pdf':
+  if (defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS) {
+    return PDFView(
+      filePath: widget.book.filePath,
+      enableSwipe: true,
+      swipeHorizontal: true,
+      nightMode: _nightMode,
+      autoSpacing: true,
+      pageFling: true,
+      onRender: (pages) => setState(() => _pdfTotalPages = pages ?? 0),
+      onViewCreated: (controller) =>
+          setState(() => _pdfViewController = controller),
+      onPageChanged: (page, total) => setState(() {
+        _pdfCurrentPage = page ?? 0;
+        _pdfTotalPages = total ?? 0;
+      }),
+      onError: (e) => debugPrint('PDF error: $e'),
+    );
+  } else {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.picture_as_pdf_outlined,
+              color: AppTheme.textMuted, size: 48),
+          const SizedBox(height: 16),
+          const Text(
+            'PDF reading is only\nsupported on Android',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Run the app on your phone\nto read this file',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+          ),
+        ],
       ),
     );
+  }
+
+      default: // TXT
+        return PageView.builder(
+          controller: _pageController,
+          itemCount: _pages.length,
+          onPageChanged: (page) {
+            setState(() => _currentPage = page);
+            context
+                .read<LibraryService>()
+                .updateProgress(widget.book.id, page);
+          },
+          itemBuilder: (context, index) => Container(
+            color: _nightMode
+                ? const Color(0xFF0D1117)
+                : const Color(0xFFF5F0E8),
+            padding: EdgeInsets.fromLTRB(
+              24,
+              MediaQuery.of(context).padding.top + 60,
+              24,
+              MediaQuery.of(context).padding.bottom + 80,
+            ),
+            child: SingleChildScrollView(
+              child: Text(
+                _pages[index],
+                style: TextStyle(
+                  color: _nightMode
+                      ? const Color(0xFFD0D6E0)
+                      : const Color(0xFF1A1A1A),
+                  fontSize: _fontSize,
+                  height: 1.7,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
+          ),
+        );
+    }
   }
 
   Widget _buildTopBar() {
@@ -184,17 +263,15 @@ Always be on the lookout for better ways of doing things.''',
               GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: AppTheme.cardColor,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: AppTheme.borderColor),
                   ),
-                  child: const Icon(
-                    Icons.arrow_back_rounded,
-                    color: AppTheme.textPrimary,
-                    size: 18,
-                  ),
+                  child: const Icon(Icons.arrow_back_rounded,
+                      color: AppTheme.textPrimary, size: 18),
                 ),
               ),
               const SizedBox(width: 12),
@@ -215,9 +292,7 @@ Always be on the lookout for better ways of doing things.''',
                     Text(
                       widget.book.author,
                       style: const TextStyle(
-                        color: AppTheme.textMuted,
-                        fontSize: 11,
-                      ),
+                          color: AppTheme.textMuted, fontSize: 11),
                     ),
                   ],
                 ),
@@ -226,11 +301,14 @@ Always be on the lookout for better ways of doing things.''',
                 onTap: () {
                   final bm = Bookmark(
                     id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    page: _currentPage,
-                    label: 'Page ${_currentPage + 1}',
+                    page: _ext == 'pdf' ? _pdfCurrentPage : _currentPage,
+                    label:
+                        'Page ${(_ext == 'pdf' ? _pdfCurrentPage : _currentPage) + 1}',
                     createdAt: DateTime.now(),
                   );
-                  context.read<LibraryService>().addBookmark(widget.book.id, bm);
+                  context
+                      .read<LibraryService>()
+                      .addBookmark(widget.book.id, bm);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: const Text('Bookmark added'),
@@ -244,34 +322,31 @@ Always be on the lookout for better ways of doing things.''',
                   );
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: AppTheme.cardColor,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: AppTheme.borderColor),
                   ),
-                  child: const Icon(
-                    Icons.bookmark_add_outlined,
-                    color: AppTheme.textSecondary,
-                    size: 18,
-                  ),
+                  child: const Icon(Icons.bookmark_add_outlined,
+                      color: AppTheme.textSecondary, size: 18),
                 ),
               ),
               const SizedBox(width: 8),
               GestureDetector(
-                onTap: () => setState(() => _showSettings = !_showSettings),
+                onTap: () =>
+                    setState(() => _showSettings = !_showSettings),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: AppTheme.cardColor,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: AppTheme.borderColor),
                   ),
-                  child: const Icon(
-                    Icons.tune_rounded,
-                    color: AppTheme.textSecondary,
-                    size: 18,
-                  ),
+                  child: const Icon(Icons.tune_rounded,
+                      color: AppTheme.textSecondary, size: 18),
                 ),
               ),
             ],
@@ -282,143 +357,153 @@ Always be on the lookout for better ways of doing things.''',
   }
 
   Widget _buildBottomBar() {
-  return Positioned(
-    bottom: 0,
-    left: 0,
-    right: 0,
-    child: FadeTransition(
-      opacity: _uiAnim,
-      child: IgnorePointer(
-        ignoring: !_showUI,
-        child: Container(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            16,
-            20,
-            MediaQuery.of(context).padding.bottom + 12,
-          ),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.bottomCenter,
-              end: Alignment.topCenter,
-              colors: [
-                (_nightMode ? AppTheme.bgColor : const Color(0xFFF5F0E8))
-                    .withOpacity(0.95),
-                Colors.transparent,
+    final currentPage = _ext == 'pdf' ? _pdfCurrentPage : _currentPage;
+    final totalPages =
+        _ext == 'pdf' ? _pdfTotalPages : _pages.length;
+
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: FadeTransition(
+        opacity: _uiAnim,
+        child: IgnorePointer(
+          ignoring: !_showUI,
+          child: Container(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              16,
+              20,
+              MediaQuery.of(context).padding.bottom + 12,
+            ),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  (_nightMode ? AppTheme.bgColor : const Color(0xFFF5F0E8))
+                      .withOpacity(0.95),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                GestureDetector(
+                  onTap: currentPage > 0
+                      ? () {
+                          if (_ext == 'pdf') {
+                            _pdfViewController
+                                ?.setPage(_pdfCurrentPage - 1);
+                          } else {
+                            _pageController.previousPage(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                            );
+                          }
+                        }
+                      : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.cardColor,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: currentPage > 0
+                            ? AppTheme.borderColor
+                            : AppTheme.borderColor.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.arrow_back_ios_rounded,
+                            size: 14,
+                            color: currentPage > 0
+                                ? AppTheme.textSecondary
+                                : AppTheme.textMuted),
+                        const SizedBox(width: 4),
+                        Text(
+                          'PREV',
+                          style: TextStyle(
+                            color: currentPage > 0
+                                ? AppTheme.textSecondary
+                                : AppTheme.textMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Text(
+                  '${currentPage + 1} / $totalPages',
+                  style: const TextStyle(
+                      color: AppTheme.textMuted,
+                      fontSize: 12,
+                      letterSpacing: 0.5),
+                ),
+                GestureDetector(
+                  onTap: currentPage < totalPages - 1
+                      ? () {
+                          if (_ext == 'pdf') {
+                            _pdfViewController
+                                ?.setPage(_pdfCurrentPage + 1);
+                          } else {
+                            _pageController.nextPage(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                            );
+                          }
+                        }
+                      : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: currentPage < totalPages - 1
+                          ? AppTheme.accentGreen.withOpacity(0.1)
+                          : AppTheme.cardColor,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: currentPage < totalPages - 1
+                            ? AppTheme.accentGreen
+                            : AppTheme.borderColor.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          'NEXT',
+                          style: TextStyle(
+                            color: currentPage < totalPages - 1
+                                ? AppTheme.accentGreen
+                                : AppTheme.textMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.arrow_forward_ios_rounded,
+                            size: 14,
+                            color: currentPage < totalPages - 1
+                                ? AppTheme.accentGreen
+                                : AppTheme.textMuted),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Previous button
-              GestureDetector(
-                onTap: _currentPage > 0
-                    ? () {
-                        _pageController.previousPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      }
-                    : null,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppTheme.cardColor,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: _currentPage > 0
-                          ? AppTheme.borderColor
-                          : AppTheme.borderColor.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.arrow_back_ios_rounded,
-                          size: 14,
-                          color: _currentPage > 0
-                              ? AppTheme.textSecondary
-                              : AppTheme.textMuted),
-                      const SizedBox(width: 4),
-                      Text(
-                        'PREV',
-                        style: TextStyle(
-                          color: _currentPage > 0
-                              ? AppTheme.textSecondary
-                              : AppTheme.textMuted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // Page indicator
-              Text(
-                '${_currentPage + 1} / ${_pages.length}',
-                style: const TextStyle(
-                  color: AppTheme.textMuted,
-                  fontSize: 12,
-                  letterSpacing: 0.5,
-                ),
-              ),
-
-              // Next button
-              GestureDetector(
-                onTap: _currentPage < _pages.length - 1
-                    ? () {
-                        _pageController.nextPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      }
-                    : null,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: _currentPage < _pages.length - 1
-                        ? AppTheme.accentGreen.withOpacity(0.1)
-                        : AppTheme.cardColor,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: _currentPage < _pages.length - 1
-                          ? AppTheme.accentGreen
-                          : AppTheme.borderColor.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        'NEXT',
-                        style: TextStyle(
-                          color: _currentPage < _pages.length - 1
-                              ? AppTheme.accentGreen
-                              : AppTheme.textMuted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(Icons.arrow_forward_ios_rounded,
-                          size: 14,
-                          color: _currentPage < _pages.length - 1
-                              ? AppTheme.accentGreen
-                              : AppTheme.textMuted),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildSettingsPanel() {
     return Positioned(
@@ -454,22 +539,23 @@ Always be on the lookout for better ways of doing things.''',
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Font Size',
-                style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-              ),
+              const Text('Font Size',
+                  style: TextStyle(
+                      color: AppTheme.textSecondary, fontSize: 12)),
               const SizedBox(height: 6),
               Row(
                 children: [
                   GestureDetector(
-                    onTap: () => setState(() => _fontSize = max(12, _fontSize - 1)),
-                    child: _SettingBtn(label: 'A', small: true),
+                    onTap: () => setState(() =>
+                        _fontSize = _fontSize > 12 ? _fontSize - 1 : 12),
+                    child: const _SettingBtn(label: 'A', small: true),
                   ),
                   Expanded(
                     child: SliderTheme(
                       data: SliderThemeData(
                         trackHeight: 2,
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                        thumbShape:
+                            const RoundSliderThumbShape(enabledThumbRadius: 6),
                         thumbColor: AppTheme.accentGreen,
                         activeTrackColor: AppTheme.accentGreen,
                         inactiveTrackColor: AppTheme.borderColor,
@@ -484,16 +570,16 @@ Always be on the lookout for better ways of doing things.''',
                     ),
                   ),
                   GestureDetector(
-                    onTap: () => setState(() => _fontSize = min(24, _fontSize + 1)),
-                    child: _SettingBtn(label: 'A', small: false),
+                    onTap: () => setState(() =>
+                        _fontSize = _fontSize < 24 ? _fontSize + 1 : 24),
+                    child: const _SettingBtn(label: 'A', small: false),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Theme',
-                style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-              ),
+              const Text('Theme',
+                  style: TextStyle(
+                      color: AppTheme.textSecondary, fontSize: 12)),
               const SizedBox(height: 6),
               Row(
                 children: [
