@@ -244,7 +244,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
             const SizedBox(height: 8),
             Text(
               _filePath.isEmpty ? 'TAP TO SELECT FILE' : 'FILE SELECTED',
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppTheme.accentGreen,
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
@@ -270,7 +270,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
   Widget _buildSectionLabel(String label) {
     return Text(
       label,
-      style: const TextStyle(
+      style: TextStyle(
         color: AppTheme.accentGreen,
         fontSize: 10,
         letterSpacing: 2,
@@ -301,7 +301,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
               ),
             ),
             if (required)
-              const Text(' *', style: TextStyle(color: AppTheme.accentGreen, fontSize: 12)),
+              Text(' *', style: TextStyle(color: AppTheme.accentGreen, fontSize: 12)),
           ],
         ),
         const SizedBox(height: 6),
@@ -327,7 +327,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(6),
-              borderSide: const BorderSide(color: AppTheme.accentGreen),
+              borderSide: BorderSide(color: AppTheme.accentGreen),
             ),
           ),
         ),

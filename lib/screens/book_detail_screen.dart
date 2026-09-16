@@ -121,7 +121,7 @@ class BookDetailScreen extends StatelessWidget {
           },
           itemBuilder: (_) => [
             if (book.status != ReadingStatus.finished)
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'mark_finished',
                 child: Row(children: [
                   Icon(Icons.check_circle_outline_rounded,
@@ -290,7 +290,7 @@ class BookDetailScreen extends StatelessWidget {
             child: LinearProgressIndicator(
               value: book.progress,
               backgroundColor: AppTheme.borderColor,
-              valueColor: const AlwaysStoppedAnimation(AppTheme.accentGreen),
+              valueColor: AlwaysStoppedAnimation(AppTheme.accentGreen),
               minHeight: 6,
             ),
           ),
@@ -344,7 +344,7 @@ class BookDetailScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'DESCRIPTION',
           style: TextStyle(
             color: AppTheme.accentGreen,
@@ -380,7 +380,7 @@ class BookDetailScreen extends StatelessWidget {
         ),
         child: Text(
           '# $tag',
-          style: const TextStyle(
+          style: TextStyle(
             color: AppTheme.accentGreen,
             fontSize: 11,
             fontWeight: FontWeight.w500,
@@ -395,7 +395,7 @@ class BookDetailScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'BOOKMARKS',
           style: TextStyle(
             color: AppTheme.accentGreen,
@@ -416,7 +416,7 @@ class BookDetailScreen extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.bookmark_rounded,
+                Icon(Icons.bookmark_rounded,
                     color: AppTheme.accentGreen, size: 14),
                 const SizedBox(width: 10),
                 Expanded(

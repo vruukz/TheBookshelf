@@ -61,7 +61,7 @@ class StatsScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'OVERVIEW',
           style: TextStyle(
             color: AppTheme.accentGreen,
@@ -128,7 +128,7 @@ class StatsScreen extends StatelessWidget {
                     ),
                     Text(
                       '${(library.booksRead / library.totalBooks * 100).toStringAsFixed(0)}%',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppTheme.accentGreen,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -144,7 +144,7 @@ class StatsScreen extends StatelessWidget {
                         ? library.booksRead / library.totalBooks
                         : 0,
                     backgroundColor: AppTheme.borderColor,
-                    valueColor: const AlwaysStoppedAnimation(AppTheme.accentGreen),
+                    valueColor: AlwaysStoppedAnimation(AppTheme.accentGreen),
                     minHeight: 6,
                   ),
                 ),
@@ -166,7 +166,7 @@ class StatsScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'BY FORMAT',
           style: TextStyle(
             color: AppTheme.accentGreen,
@@ -250,7 +250,7 @@ class StatsScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'READING STATUS',
           style: TextStyle(
             color: AppTheme.accentGreen,
@@ -323,7 +323,7 @@ class StatsScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'TOP AUTHORS',
           style: TextStyle(
             color: AppTheme.accentGreen,
@@ -354,7 +354,7 @@ class StatsScreen extends StatelessWidget {
                   child: Center(
                     child: Text(
                       e.key[0].toUpperCase(),
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppTheme.accentGreen,
                         fontSize: 13,
                         fontWeight: FontWeight.w800,

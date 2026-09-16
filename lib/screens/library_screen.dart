@@ -394,7 +394,7 @@ class _GridBookCard extends StatelessWidget {
                       child: LinearProgressIndicator(
                         value: book.progress,
                         backgroundColor: AppTheme.borderColor,
-                        valueColor: const AlwaysStoppedAnimation(AppTheme.accentGreen),
+                        valueColor: AlwaysStoppedAnimation(AppTheme.accentGreen),
                         minHeight: 2,
                       ),
                     ),

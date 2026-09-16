@@ -106,7 +106,7 @@ class BookListTile extends StatelessWidget {
                             child: LinearProgressIndicator(
                               value: book.progress,
                               backgroundColor: AppTheme.borderColor,
-                              valueColor: const AlwaysStoppedAnimation(
+                              valueColor: AlwaysStoppedAnimation(
                                   AppTheme.accentGreen),
                               minHeight: 3,
                             ),
@@ -115,7 +115,7 @@ class BookListTile extends StatelessWidget {
                         const SizedBox(width: 8),
                         Text(
                           book.progressPercent,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppTheme.accentGreen,
                             fontSize: 10,
                             fontWeight: FontWeight.w700,

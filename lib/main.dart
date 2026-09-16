@@ -5,8 +5,9 @@ import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
 import 'services/library_service.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppTheme.loadAccent();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -25,11 +26,14 @@ class BookVaultApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => LibraryService(),
-      child: MaterialApp(
-        title: 'BookVault',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.darkTheme,
-        home: const HomeScreen(),
+      child: ValueListenableBuilder<Color>(
+        valueListenable: AppTheme.accentNotifier,
+        builder: (context, accent, _) => MaterialApp(
+          title: 'BookVault',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.darkTheme,
+          home: const HomeScreen(),
+        ),
       ),
     );
   }

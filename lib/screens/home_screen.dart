@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import '../services/library_service.dart';
 import '../theme/app_theme.dart';
 import '../models/book.dart';
@@ -60,7 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIndex: _selectedIndex,
         onDestinationSelected: (i) => setState(() => _selectedIndex = i),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: const [
+        destinations: [
           NavigationDestination(
             icon: Icon(Icons.home_outlined, color: AppTheme.textMuted),
             selectedIcon: Icon(Icons.home_rounded, color: AppTheme.accentGreen),
@@ -121,6 +122,38 @@ class _HomeTab extends StatelessWidget {
     );
   }
 
+  void _openAccentPicker(BuildContext context) {
+    Color pending = AppTheme.accentGreen;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.cardColor,
+        title: const Text('Accent color', style: TextStyle(color: AppTheme.textPrimary)),
+        content: SingleChildScrollView(
+          child: ColorPicker(
+            pickerColor: pending,
+            onColorChanged: (color) => pending = color,
+            enableAlpha: false,
+            labelTypes: const [],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              AppTheme.setAccent(pending);
+              Navigator.of(context).pop();
+            },
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAppBar(BuildContext context) {
     return SliverAppBar(
       floating: true,
@@ -134,7 +167,7 @@ class _HomeTab extends StatelessWidget {
               border: Border.all(color: AppTheme.accentGreen),
               borderRadius: BorderRadius.circular(4),
             ),
-            child: const Text(
+            child: Text(
               'BV',
               style: TextStyle(
                 color: AppTheme.accentGreen,
@@ -163,7 +196,7 @@ class _HomeTab extends StatelessWidget {
         ),
         IconButton(
           icon: const Icon(Icons.settings_outlined, color: AppTheme.textSecondary),
-          onPressed: () {},
+          onPressed: () => _openAccentPicker(context),
         ),
         const SizedBox(width: 8),
       ],
@@ -202,7 +235,7 @@ class _HomeTab extends StatelessWidget {
                   ),
                 ),
                 if (library.booksReading > 0)
-                  const TextSpan(
+                  TextSpan(
                     text: '.',
                     style: TextStyle(
                       color: AppTheme.accentGreen,
@@ -281,7 +314,7 @@ class _HomeTab extends StatelessWidget {
           children: [
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppTheme.accentGreen,
                 fontSize: 11,
                 fontWeight: FontWeight.w700,

@@ -529,7 +529,7 @@ class _ReaderScreenState extends State<ReaderScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'READER SETTINGS',
                 style: TextStyle(
                   color: AppTheme.accentGreen,
